@@ -1,0 +1,405 @@
+import java.io.*;
+import java.util.HashMap;
+import java.util.Scanner;
+
+public class EmployeeManagementSystem {
+
+    static class Employee {
+        String id;
+        String name;
+        String department;
+        long salary;
+
+        Employee(String id, String name, String department, long salary) {
+            this.id = id;
+            this.name = name;
+            this.department = department;
+            this.salary = salary;
+        }
+
+        public String toString() {
+            return id + " | " + name + " | " + department + " | " + salary;
+        }
+
+        String toFileLine() {
+            return id + "|" + name + "|" + department + "|" + salary;
+        }
+    }
+
+    static class Node {
+        Employee data;
+        Node next;
+
+        Node(Employee data) {
+            this.data = data;
+            this.next = null;
+        }
+    }
+
+    static class EmployeeList {
+        Node head;
+        int size;
+        HashMap<String, Employee> idMap = new HashMap<>();
+
+        void add(Employee emp) {
+            Node newNode = new Node(emp);
+            if (head == null) {
+                head = newNode;
+            } else {
+                Node temp = head;
+                while (temp.next != null) {
+                    temp = temp.next;
+                }
+                temp.next = newNode;
+            }
+            idMap.put(emp.id, emp);
+            size++;
+        }
+
+        Employee searchById(String id) {
+            return idMap.get(id.toUpperCase());
+        }
+
+        Employee[] searchByName(String keyword) {
+            keyword = keyword.toLowerCase();
+            int count = 0;
+            Node temp = head;
+            while (temp != null) {
+                if (temp.data.name.toLowerCase().contains(keyword)) {
+                    count++;
+                }
+                temp = temp.next;
+            }
+
+            Employee[] found = new Employee[count];
+            int i = 0;
+            temp = head;
+            while (temp != null) {
+                if (temp.data.name.toLowerCase().contains(keyword)) {
+                    found[i] = temp.data;
+                    i++;
+                }
+                temp = temp.next;
+            }
+            return found;
+        }
+
+        boolean delete(String id) {
+            id = id.toUpperCase();
+            if (!idMap.containsKey(id)) {
+                return false;
+            }
+
+            if (head.data.id.equals(id)) {
+                head = head.next;
+            } else {
+                Node prev = head;
+                while (prev.next != null && !prev.next.data.id.equals(id)) {
+                    prev = prev.next;
+                }
+                if (prev.next == null) {
+                    return false;
+                }
+                prev.next = prev.next.next;
+            }
+
+            idMap.remove(id);
+            size--;
+            return true;
+        }
+
+        void displayAll() {
+            if (head == null) {
+                System.out.println("No employees found.");
+                return;
+            }
+            System.out.println("ID | Name | Department | Salary");
+            System.out.println("-----------------------------");
+            Node temp = head;
+            while (temp != null) {
+                System.out.println(temp.data);
+                temp = temp.next;
+            }
+            System.out.println("Total employees: " + size);
+        }
+
+        void sortBySalary() {
+            head = mergeSort(head);
+        }
+
+        Node mergeSort(Node start) {
+            if (start == null || start.next == null) {
+                return start;
+            }
+            Node middle = findMiddle(start);
+            Node second = middle.next;
+            middle.next = null;
+
+            Node left = mergeSort(start);
+            Node right = mergeSort(second);
+            return merge(left, right);
+        }
+
+        Node findMiddle(Node start) {
+            Node slow = start;
+            Node fast = start.next;
+            while (fast != null && fast.next != null) {
+                slow = slow.next;
+                fast = fast.next.next;
+            }
+            return slow;
+        }
+
+        Node merge(Node a, Node b) {
+            Node dummy = new Node(null);
+            Node tail = dummy;
+            while (a != null && b != null) {
+                if (a.data.salary >= b.data.salary) {
+                    tail.next = a;
+                    a = a.next;
+                } else {
+                    tail.next = b;
+                    b = b.next;
+                }
+                tail = tail.next;
+            }
+            if (a != null) {
+                tail.next = a;
+            } else {
+                tail.next = b;
+            }
+            return dummy.next;
+        }
+
+        void showSalaryList() {
+            if (head == null) {
+                System.out.println("No employees found.");
+                return;
+            }
+            int rank = 1;
+            Node temp = head;
+            while (temp != null) {
+                System.out.println(rank + ". " + temp.data.id + " | " + temp.data.name + " | " + temp.data.salary);
+                rank++;
+                temp = temp.next;
+            }
+        }
+
+        void saveToFile(String fileName) {
+            try (PrintWriter writer = new PrintWriter(new FileWriter(fileName))) {
+                Node temp = head;
+                while (temp != null) {
+                    writer.println(temp.data.toFileLine());
+                    temp = temp.next;
+                }
+            } catch (IOException e) {
+                System.out.println("Could not save file: " + e.getMessage());
+            }
+        }
+    }
+
+    static final String FILE_NAME = "employees.txt";
+    static EmployeeList list = new EmployeeList();
+    static int nextId = 101;
+    static Scanner sc;
+
+    static void loadFromFile() {
+        File file = new File(FILE_NAME);
+        if (!file.exists()) {
+            return;
+        }
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line;
+            int maxId = 100;
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty()) {
+                    continue;
+                }
+                String[] parts = line.split("\\|");
+                if (parts.length != 4) {
+                    continue;
+                }
+                try {
+                    long salary = Long.parseLong(parts[3].trim());
+                    Employee emp = new Employee(parts[0].trim(), parts[1].trim(), parts[2].trim(), salary);
+                    list.add(emp);
+                    int num = Integer.parseInt(emp.id.substring(1));
+                    if (num > maxId) {
+                        maxId = num;
+                    }
+                } catch (NumberFormatException e) {
+                    continue;
+                }
+            }
+            nextId = maxId + 1;
+        } catch (IOException e) {
+            System.out.println("Could not read file: " + e.getMessage());
+        }
+    }
+
+    static String readLine(String message) {
+        System.out.print(message);
+        if (!sc.hasNextLine()) {
+            return null;
+        }
+        return sc.nextLine().trim();
+    }
+
+    static String readText(String message) {
+        while (true) {
+            String text = readLine(message);
+            if (text == null) {
+                return null;
+            }
+            if (text.isEmpty()) {
+                System.out.println("This field cannot be empty.");
+            } else if (text.contains("|")) {
+                System.out.println("The '|' character is not allowed.");
+            } else {
+                return text;
+            }
+        }
+    }
+
+    static void addEmployee() {
+        String name = readText("Name: ");
+        if (name == null) {
+            return;
+        }
+        String dept = readText("Department: ");
+        if (dept == null) {
+            return;
+        }
+
+        long salary;
+        while (true) {
+            String input = readLine("Salary: ");
+            if (input == null) {
+                return;
+            }
+            try {
+                salary = Long.parseLong(input);
+                if (salary <= 0) {
+                    System.out.println("Salary must be greater than zero.");
+                    continue;
+                }
+                break;
+            } catch (NumberFormatException e) {
+                System.out.println("Please enter a valid number.");
+            }
+        }
+
+        String id = "E" + nextId;
+        nextId++;
+        Employee emp = new Employee(id, name, dept, salary);
+        list.add(emp);
+        System.out.println("Employee added. ID: " + emp);
+    }
+
+    static void searchEmployee() {
+        System.out.println("Search by: 1. ID   2. Name");
+        String choice = readLine("Choice: ");
+        if (choice == null) {
+            return;
+        }
+
+        if (choice.equals("1")) {
+            String id = readLine("Employee ID: ");
+            if (id == null) {
+                return;
+            }
+            Employee emp = list.searchById(id);
+            if (emp == null) {
+                System.out.println("Employee " + id.toUpperCase() + " not found.");
+            } else {
+                System.out.println(emp);
+            }
+        } else if (choice.equals("2")) {
+            String name = readLine("Employee Name: ");
+            if (name == null) {
+                return;
+            }
+            Employee[] found = list.searchByName(name);
+            if (found.length == 0) {
+                System.out.println("Employee " + name + " not found.");
+            } else {
+                for (Employee emp : found) {
+                    System.out.println(emp);
+                }
+            }
+        } else {
+            System.out.println("Invalid choice.");
+        }
+    }
+
+    static void deleteEmployee() {
+        String id = readLine("Employee ID: ");
+        if (id == null) {
+            return;
+        }
+        if (list.delete(id)) {
+            System.out.println("Employee " + id.toUpperCase() + " deleted. Total employees: " + list.size);
+        } else {
+            System.out.println("Employee " + id.toUpperCase() + " not found.");
+        }
+    }
+
+    static void sortEmployees() {
+        list.sortBySalary();
+        list.showSalaryList();
+    }
+
+    static void showMenu() {
+        System.out.println();
+        System.out.println("===== Employee Management System =====");
+        System.out.println("1. Add employee");
+        System.out.println("2. Display all employees");
+        System.out.println("3. Search employee (by ID / name)");
+        System.out.println("4. Delete employee");
+        System.out.println("5. Sort by salary (high to low)");
+        System.out.println("6. Exit");
+    }
+
+    public static void main(String[] args) {
+        sc = new Scanner(System.in);
+        loadFromFile();
+
+        boolean running = true;
+        while (running) {
+            showMenu();
+            String choice = readLine("Enter option: ");
+            if (choice == null) {
+                break;
+            }
+
+            switch (choice) {
+                case "1":
+                    addEmployee();
+                    break;
+                case "2":
+                    list.displayAll();
+                    break;
+                case "3":
+                    searchEmployee();
+                    break;
+                case "4":
+                    deleteEmployee();
+                    break;
+                case "5":
+                    sortEmployees();
+                    break;
+                case "6":
+                    running = false;
+                    break;
+                default:
+                    System.out.println("Invalid option. Please choose 1-6.");
+            }
+        }
+
+        list.saveToFile(FILE_NAME);
+        System.out.println("Data saved to " + FILE_NAME + ". Goodbye!");
+        sc.close();
+    }
+}
